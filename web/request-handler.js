@@ -1,36 +1,72 @@
-var path = require('path');
-var archive = require('../helpers/archive-helpers');
-// require more modules/folders here!
-var httpHelpers = require('./http-helpers');
-var fs = require('fs');
+// var path = require('path');
+// var fs = require('fs');
 // var url = require('url');
+// require more modules/folders here!
+var archive = require('../helpers/archive-helpers');
+var httpHelpers = require('./http-helpers');
+
+var dataHandler = function(req, callback){
+  var data = '';
+  req.on('data', function(packet) {
+    data += packet;
+  });
+
+  req.on('end', function() {
+    callback(data.slice(4));
+  });
+};
+
+var actions = {
+  'GET': function(req, res){
+    var asset = routes[req.url];
+    // console.log('asset:', asset);
+    if (asset) {
+      httpHelpers.serveAssets(res, asset, httpHelpers.sendResponse);
+    }
+    else {
+      archive.isUrlArchived(req.url, function(exists) {
+        if (exists) {
+          archive.serveArchives(req.url, res, httpHelpers.sendResponse);
+        } else {
+          httpHelpers.sendResponse(res, 'File Not Found...', 404);
+        }
+      });
+    }
+  },
+  'POST': function(req, res){
+    dataHandler(req, function(data){
+      archive.isUrlArchived(data, function(exists) {
+        if (exists) {
+          archive.serveArchives(data, res, httpHelpers.sendResponse);
+        } else {
+          archive.isUrlInList(data, function(exists){
+            if (!exists) {
+              archive.addUrlToList(data, function() {
+                console.log('Append successful')
+                httpHelpers.serveAssets(res, 'loading.html', httpHelpers.sendResponse);
+              });
+            }
+            else {
+              httpHelpers.serveAssets(res, 'loading.html', httpHelpers.sendResponse);
+            }
+          });
+        }
+      });
+    });
+  }
+};
 
 exports.handleRequest = function (req, res) {
-  // res.end(archive.paths.list);
-  // Check if incoming request method is GET
-    // Check if it's asking for / or /index.html
-      // fetch index.html from disk and send back as response
-      // - get asset name
-      var asset = routes[req.url];
-      // console.log('asset:', asset);
-      if (asset) {
-        httpHelpers.serveAssets(res, asset, httpHelpers.sendResponse);
-      }
-      else {
-        // check if we have archived copy
-        archive.serveArchives(req, res, httpHelpers.sendResponse);
 
-
-        // httpHelpers.sendResponse(res, 'File Not Found...', 404);
-      }
-
-        // - callback: sending the response, once the data is collected by fs
-
+  var action = actions[req.method];
+  if (action) {
+    action(req, res);
+  } else {
+  }
 };
 
 var routes = {
   '/': 'index.html',
   '/index.html': 'index.html',
   '/styles.css': 'styles.css'
-  // '/www.google.com': 'www.google.com'
 };

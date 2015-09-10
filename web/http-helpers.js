@@ -15,19 +15,18 @@ exports.serveAssets = function(res, asset, callback) {
   // css, or anything that doesn't change often.)
   var file = archive.paths.siteAssets + '/' + asset;
   var contentType = getContentType(asset);
-  console.log('File =', file);
+  var statusCode = (asset === 'loading.html') ? 302 : 200;
+
+  // console.log('File =', file);
   fs.readFile(file, function(err, data) {
     if (err) {
       throw err;
     }
     else {
-      // callback - sendResponse
-      callback(res, data, 200, contentType);
+      callback(res, data, statusCode, contentType);  // sendResponse passed in as callback
     }
   });
 };
-
-
 
 // As you progress, keep thinking about what helper functions you can put here!
 exports.sendResponse = function(response, data, statusCode, contentType){
